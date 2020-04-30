@@ -171,7 +171,7 @@ Sea = function(){
 		color:Colors.blue,
 		transparent:false,
 		opacity:1,
-		shading:THREE.FlatShading,
+		flatShading:THREE.FlatShading,
 	});
 
 
@@ -213,7 +213,7 @@ var moon;
 
 function createMoon(){
     moon = new Moon();
-    moon.mesh.position.set(-120, 140 , -50);
+    moon.mesh.position.set(-80, 140 , -50);
     moon.mesh.scale.setScalar(35);
     scene.add(moon.mesh);
 }
@@ -300,19 +300,114 @@ function loop(){
 	requestAnimationFrame(loop);
 }
 
+function onWindowResize() {
 
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize( window.innerWidth, window.innerHeight );
+ 
+ }
 
 function init(event){
     createScene();
     createLights();
-    createMoon();
+    //createMoon();
     createStar();
     createSea();
     
     sea.moveWaves();
-    
+      // Setup a geometry
+  const geometry = new THREE.SphereGeometry(1, 32, 64);
+
+  const circlegeom = new THREE.CircleGeometry(1, 32);
+
+  const basegeom = new THREE.IcosahedronGeometry(1, 1);
+  const points = basegeom.vertices;
+  const vertexShader = /* glsl */`
+  varying vec2 vUv;
+  varying vec3 vPosition;
+  void main(){
+    vUv = uv;
+    vPosition = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position.xyz, 1.0);
+  }
+  `;
+
+  const fragmentShader =/* glsl */ `
+
+uniform mat4 modelMatrix;
+
+float sphereRim (vec3 spherePosition) {
+  vec3 normal = normalize(spherePosition.xyz);
+  vec3 worldNormal = normalize(mat3(modelMatrix) * normal.xyz);
+  vec3 worldPosition = (modelMatrix * vec4(spherePosition, 1.0)).xyz;
+  vec3 V = normalize(cameraPosition - worldPosition);
+  float rim = 1.0 - max(dot(V, worldNormal), 0.0);
+  return pow(smoothstep(0.0, 1.0, rim), 0.5);
+}
+  
+    varying vec2 vUv;
+    varying vec3 vPosition;
+    uniform vec3 color;
+    uniform vec3 colora;
+    uniform vec3 rimcolor;
+    uniform vec3 points[POINT_COUNT];
+    uniform float time;
+
+
+ 
+    void main(){   
+      float dist = 100000.0;
+      for (int i = 0; i < POINT_COUNT; i++){
+        vec3 p = points[i];
+        float d = distance(vPosition, p);
+        dist = min(d, dist);
+      }
+      float mask = step(0.2, dist);
+      mask = 1.0 - mask;
+
+      vec3 fragcolor = mix(color, colora, dist);
+      
+      float rim = sphereRim(vPosition);
+        rim = rim * .50;
+      
+      gl_FragColor = vec4(mix(fragcolor , rimcolor, rim), 1.0) ;
+    }
+  `;
+
+  // Setup a material
+  const material = new THREE.ShaderMaterial({
+    defines:{
+      POINT_COUNT : points.length
+    },
+    uniforms :{
+      time: { type: 'f', value : 0.0 },  
+      color : { type: 'vec3', value : new THREE.Color('white') },
+      colora : { type: 'vec3', value : new THREE.Color('#cecece') },
+      rimcolor: { type: 'vec3', value : new THREE.Color('#3D3373') },
+      tDiffuse: { type: "t", value: null },
+      amount:   { type: "f", value: 0.5 },
+      size:     { type: "f", value: 4.0 },
+      points:  { type: 'f', value : points}
+    },
+
+    fragmentShader,
+
+    vertexShader
+  });
+
+  // Setup a mesh with geometry + material
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.scale.setScalar(50);
+  mesh.position.set(-80, 140 , -50);
+  scene.add(mesh);
+
+
+  
     loop();
     document.addEventListener( 'mousemove', onMouseMove, false );
+    
 }
 
 window.addEventListener('load', init, false);
+window.addEventListener( 'resize', onWindowResize, false );

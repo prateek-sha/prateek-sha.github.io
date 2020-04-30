@@ -213,7 +213,7 @@ var moon;
 
 function createMoon(){
     moon = new Moon();
-    moon.mesh.position.set(-120, 140 , -50);
+    moon.mesh.position.set(-80, 140 , -50);
     moon.mesh.scale.setScalar(35);
     scene.add(moon.mesh);
 }
